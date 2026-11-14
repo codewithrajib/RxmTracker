@@ -1,0 +1,1246 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamTrack - Personal Vault</title>
+
+    <!-- PWA Settings & Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ExamTrack">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Firebase SDKs (Compat versions) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); }
+
+        /* Make date picker icon bright white & clearly visible */
+        input[type="date"] {
+            color-scheme: dark;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: brightness(0) invert(1);
+            cursor: pointer;
+            opacity: 0.9;
+            transition: opacity 0.2s ease;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800/80 bg-slate-900/80 sticky top-0 z-40 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-sky-600/20 text-sky-400 rounded-xl border border-sky-500/30 shadow-inner">
+                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">ExamTrack</h1>
+                    <p class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-lock text-[10px] text-emerald-400"></i>
+                        <span>Personal Vault</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3">
+                <!-- PWA Install Button (Appears when browser triggers install prompt) -->
+                <button id="installAppBtn" onclick="triggerPwaInstall()" class="hidden px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/40 transition flex items-center space-x-2 shadow-sm animate-pulse">
+                    <i class="fa-solid fa-arrow-down-to-bracket text-sky-400"></i>
+                    <span class="hidden sm:inline">Install App</span>
+                </button>
+
+                <!-- Auth State UI -->
+                <div id="authContainer" class="flex items-center space-x-3">
+                    <!-- Google Sign In Button (Shown when logged out) -->
+                    <button id="loginBtn" onclick="handleLogin()" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition flex items-center space-x-2 shadow-lg shadow-sky-600/25">
+                        <i class="fa-brands fa-google text-sm"></i>
+                        <span>Sign In</span>
+                    </button>
+
+                    <!-- User Profile & Sign Out (Shown when logged in) -->
+                    <div id="userInfo" class="hidden flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1">
+                        <div class="relative">
+                            <img id="userAvatar" class="w-7 h-7 rounded-full border border-sky-500/50 object-cover" src="" alt="User Avatar">
+                            <span class="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900" title="Cloud Synced"></span>
+                        </div>
+                        <span id="userName" class="text-xs font-medium text-slate-300 hidden md:inline"></span>
+                        <button onclick="handleLogout()" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition" title="Sign Out">
+                            <i class="fa-solid fa-right-from-bracket text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application View -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- ================= LOCKED GATE VIEW (Shown when logged out) ================= -->
+        <div id="lockGate" class="py-16 px-4 flex flex-col items-center justify-center text-center">
+            <div class="max-w-md w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-8 shadow-2xl backdrop-blur-sm space-y-5">
+                <div class="w-16 h-16 rounded-2xl bg-sky-600/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-white">Private Exam Vault</h2>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                        This application is strictly locked for your personal use. Sign in with your designated Google account to decrypt and access your exam records.
+                    </p>
+                </div>
+                
+                <div class="pt-2">
+                    <button onclick="handleLogin()" class="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-2 transition shadow-lg shadow-sky-600/25">
+                        <i class="fa-brands fa-google text-sm"></i>
+                        <span>Sign In with Google</span>
+                    </button>
+                </div>
+
+                <div id="configNotice" class="hidden p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-[11px] text-amber-300/90 text-left">
+                    <i class="fa-solid fa-code me-1 text-amber-400"></i>
+                    <strong>Configuration required:</strong> Paste your Firebase credentials into the <code>firebaseConfig</code> block at the top of the <code>&lt;script&gt;</code> tag in this file.
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= DASHBOARD VIEW (Shown when authenticated) ================= -->
+        <div id="dashboardView" class="hidden space-y-6">
+            <!-- Dashboard Stats Overview -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-slate-400 font-medium">Total Exams</p>
+                    <h3 id="statTotal" class="text-2xl font-bold text-white mt-1">0</h3>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-sky-400 font-medium">Upcoming Exams</p>
+                    <h3 id="statUpcoming" class="text-2xl font-bold text-sky-400 mt-1">0</h3>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-amber-400 font-medium">Results Awaited</p>
+                    <h3 id="statAwaited" class="text-2xl font-bold text-amber-400 mt-1">0</h3>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-emerald-400 font-medium">Passed</p>
+                    <h3 id="statPassed" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-rose-400 font-medium">Failed / Cancelled</p>
+                    <h3 id="statFailed" class="text-2xl font-bold text-rose-400 mt-1">0</h3>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p class="text-xs text-indigo-400 font-medium">Total Spent (₹)</p>
+                    <h3 id="statFees" class="text-2xl font-bold text-indigo-400 mt-1">₹0</h3>
+                </div>
+            </div>
+
+            <!-- Action Bar & Controls -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-slate-900/40 p-3 rounded-xl border border-slate-800/80">
+                <!-- Search & Filters (Zero placeholder text) -->
+                <div class="flex flex-1 items-center space-x-3">
+                    <div class="relative flex-1 max-w-md">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="filterExams()" class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <select id="statusFilter" onchange="filterExams()" class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-sky-500">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Notification">Notification</option>
+                        <option value="Form Filled">Form Filled</option>
+                        <option value="Upcoming">Upcoming Exam</option>
+                        <option value="Waiting Result">Waiting Result</option>
+                        <option value="Passed">Passed</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+
+                <!-- Create New Exam -->
+                <button onclick="openExamModal()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition shadow-lg shadow-sky-600/20">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add New Exam</span>
+                </button>
+            </div>
+
+            <!-- Exams Grid -->
+            <div id="examsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamic Exam Cards injected here -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-16 bg-slate-900/20 rounded-2xl border border-dashed border-slate-800">
+                <i class="fa-solid fa-folder-open text-4xl text-slate-600 mb-3"></i>
+                <h3 class="text-base font-medium text-slate-300">No Exam Records</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Create your first exam entry to keep track of notifications, stages, scores, and syllabus.</p>
+                <button onclick="openExamModal()" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-lg text-xs font-semibold border border-slate-700">
+                    + Add Exam
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- Exam Form Modal (Create/Edit) -->
+    <div id="examModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/60">
+                <h3 id="examModalTitle" class="text-base font-bold text-white">Add Exam Record</h3>
+                <button onclick="closeModal('examModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <form id="examForm" onsubmit="saveExam(event)" class="p-6 overflow-y-auto space-y-4">
+                <input type="hidden" id="examId">
+
+                <!-- Basic Details (No placeholder text) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Exam Name *</label>
+                        <input type="text" id="examName" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Conducting Board / Body</label>
+                        <input type="text" id="conductingBody" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Post / Designation</label>
+                        <input type="text" id="postName" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Total Vacancies</label>
+                        <input type="number" id="totalPosts" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Application Fee (₹)</label>
+                        <input type="number" id="applicationFee" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Application Date</label>
+                        <input type="date" id="applicationDate" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Overall Status</label>
+                        <select id="overallStatus" onchange="onOverallStatusChange()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                            <option value="Notification">Notification</option>
+                            <option value="Form Filled">Form Filled</option>
+                            <option value="Upcoming">Upcoming Exam</option>
+                            <option value="Waiting Result">Waiting Result</option>
+                            <option value="Passed">Passed</option>
+                            <option value="Failed">Failed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Roll / Registration No. with Copy Button -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Roll / Registration No.</label>
+                    <div class="relative flex items-center">
+                        <input type="text" id="rollNumber" class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-10 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500">
+                        <button type="button" onclick="copyFieldText('rollNumber', this)" class="absolute right-1.5 p-1.5 text-slate-400 hover:text-sky-400 hover:bg-slate-800/80 rounded transition" title="Copy to clipboard">
+                            <i class="fa-regular fa-copy text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stages Dynamic List -->
+                <div class="border-t border-slate-800 pt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-bold text-slate-300">Exam Stages / Phases</label>
+                        <button type="button" onclick="addStageInput()" class="text-xs text-sky-400 hover:text-sky-300 font-medium">+ Add Stage</button>
+                    </div>
+                    <div id="stagesContainer" class="space-y-3">
+                        <!-- Dynamic stage item elements -->
+                    </div>
+                </div>
+
+                <!-- Syllabus Checklist (No placeholder text) -->
+                <div class="border-t border-slate-800 pt-4">
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Syllabus & Topics (One per line)</label>
+                    <textarea id="syllabusText" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-sky-500 font-mono"></textarea>
+                </div>
+
+                <!-- Links & Credentials (No placeholder text) -->
+                <div class="border-t border-slate-800 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Official Notification URL</label>
+                        <input type="url" id="notificationUrl" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Admit Card / Portal Link</label>
+                        <input type="url" id="admitCardUrl" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('examModal')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-semibold hover:bg-slate-700">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-sky-600/20">Save Exam</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Exam Modal -->
+    <div id="viewModal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div id="viewModalHeader" class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                <!-- Injected Header -->
+            </div>
+            <div id="viewModalBody" class="p-6 overflow-y-auto space-y-4 text-xs text-slate-300">
+                <!-- Injected Content -->
+            </div>
+            <div class="px-6 py-3 border-t border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                <button id="deleteExamBtn" onclick="" class="px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 rounded-lg font-medium transition">Delete Exam</button>
+                <button id="editExamBtn" onclick="" class="px-4 py-1.5 text-xs bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold transition">Edit Exam</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unauthorized Account Notice Modal -->
+    <div id="unauthorizedModal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-user-xmark"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">Access Denied</h3>
+            <p id="unauthorizedMsg" class="text-xs text-slate-400 leading-relaxed">
+                This account is not authorized to access this private vault.
+            </p>
+            <div class="pt-2">
+                <button onclick="handleLogout()" class="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold shadow-md">
+                    Sign Out & Return
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SCRIPT & FIREBASE CONFIG ================= -->
+    <script>
+        // =========================================================================
+        // 🔐 FIREBASE CONFIGURATION & OWNER LOCK
+        // =========================================================================
+        // 1. Paste your Firebase project configuration credentials below:
+        const firebaseConfig = {
+            apiKey: "AIzaSyBnJ-UtKm8zd19IxVQ2qhzQcF6quIDQjCw",
+            authDomain: "rxmtracker.firebaseapp.com",
+            projectId: "rxmtracker",
+            storageBucket: "rxmtracker.firebasestorage.app",
+            messagingSenderId: "318052266853",
+            appId: "1:318052266853:web:fe2105fe80dcc3e4ce678c"
+        };
+        const FIREBASE_CONFIG = firebaseConfig;
+
+        // Application State
+        let exams = [];
+        let firebaseApp = null;
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let deferredInstallPrompt = null;
+
+        // Default SVG User Avatar (Zero external image dependencies)
+        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2338bdf8'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/%3E%3C/svg%3E";
+
+        // Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+            setupPwa();
+        });
+
+        // -------------------------------------------------------------
+        // FIREBASE INITIALIZATION & AUTHENTICATION
+        // -------------------------------------------------------------
+        function initFirebase() {
+            const config = typeof firebaseConfig !== 'undefined' ? firebaseConfig : (typeof FIREBASE_CONFIG !== 'undefined' ? FIREBASE_CONFIG : null);
+            const hasCredentials = config && config.apiKey && config.projectId;
+
+            if (!hasCredentials) {
+                // Config missing notice
+                document.getElementById('configNotice').classList.remove('hidden');
+                document.getElementById('lockGate').classList.remove('hidden');
+                document.getElementById('dashboardView').classList.add('hidden');
+                document.getElementById('loginBtn').classList.remove('hidden');
+                return;
+            }
+
+            try {
+                if (!firebase.apps.length) {
+                    firebaseApp = firebase.initializeApp(config);
+                } else {
+                    firebaseApp = firebase.app();
+                }
+
+                db = firebase.firestore();
+                auth = firebase.auth();
+
+                // Handle redirect result for mobile browsers
+                auth.getRedirectResult().catch(err => {
+                    console.error("Redirect login result error:", err);
+                });
+
+                // Enable Firestore offline persistence for smooth offline caching
+                db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+
+                // Auth State Observer
+                auth.onAuthStateChanged(user => {
+                    const lockGate = document.getElementById('lockGate');
+                    const dashboardView = document.getElementById('dashboardView');
+                    const loginBtn = document.getElementById('loginBtn');
+                    const userInfo = document.getElementById('userInfo');
+
+                    if (user) {
+                        currentUser = user;
+                        closeModal('unauthorizedModal');
+                        loginBtn.classList.add('hidden');
+                        userInfo.classList.remove('hidden');
+                        document.getElementById('userAvatar').src = user.photoURL || DEFAULT_AVATAR;
+                        document.getElementById('userName').innerText = user.displayName || user.email.split('@')[0];
+
+                        lockGate.classList.add('hidden');
+                        dashboardView.classList.remove('hidden');
+
+                        // Sync Firestore (Security Rules enforce read/write access)
+                        listenToFirestore();
+
+                    } else {
+                        // Logged Out
+                        currentUser = null;
+                        userInfo.classList.add('hidden');
+                        loginBtn.classList.remove('hidden');
+                        dashboardView.classList.add('hidden');
+                        lockGate.classList.remove('hidden');
+                        exams = [];
+                        renderExams();
+                    }
+                });
+
+            } catch (err) {
+                console.error("Firebase init failed:", err);
+            }
+        }
+
+        function handleLogin() {
+            if (!auth) {
+                alert("Firebase is not initialized yet. Check your config credentials.");
+                return;
+            }
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch(err => {
+                console.error("Login error:", err);
+                if (err.code === 'auth/popup-blocked') {
+                    auth.signInWithRedirect(provider);
+                } else {
+                    alert("Sign In Error: " + err.message);
+                }
+            });
+        }
+
+        function handleLogout() {
+            closeModal('unauthorizedModal');
+            if (auth) {
+                auth.signOut();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // FIRESTORE REAL-TIME SYNC
+        // -------------------------------------------------------------
+        function listenToFirestore() {
+            if (!db || !currentUser) return;
+
+            db.collection('users').doc(currentUser.uid).collection('exams')
+                .onSnapshot(snapshot => {
+                    const cloudExams = [];
+                    snapshot.forEach(doc => {
+                        cloudExams.push({ id: doc.id, ...doc.data() });
+                    });
+                    exams = cloudExams;
+                    renderExams();
+                    updateStats();
+                }, err => {
+                    if (err.code === 'permission-denied') {
+                        document.getElementById('unauthorizedMsg').innerText = 
+                            `Access Denied: The account "${currentUser ? currentUser.email : ''}" does not have read/write permission in your Firebase Security Rules.`;
+                        openModal('unauthorizedModal');
+                        auth.signOut();
+                    } else {
+                        console.error("Firestore sync error:", err);
+                    }
+                });
+        }
+
+        function persistExam(exam) {
+            if (!db || !currentUser) {
+                alert("You must be signed in to save exams.");
+                return;
+            }
+
+            db.collection('users').doc(currentUser.uid).collection('exams').doc(exam.id).set(exam)
+                .catch(err => alert("Error saving to cloud: " + err.message));
+        }
+
+        function removeExam(id) {
+            if (!db || !currentUser) return;
+
+            db.collection('users').doc(currentUser.uid).collection('exams').doc(id).delete()
+                .catch(err => alert("Error deleting: " + err.message));
+        }
+
+        // -------------------------------------------------------------
+        // EXAM MANAGEMENT & RENDERING
+        // -------------------------------------------------------------
+        function renderExams() {
+            const grid = document.getElementById('examsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusTerm = document.getElementById('statusFilter').value;
+
+            const filtered = exams.filter(e => {
+                const matchesSearch = (e.name || '').toLowerCase().includes(searchTerm) ||
+                                      (e.conductingBody || '').toLowerCase().includes(searchTerm) ||
+                                      (e.postName || '').toLowerCase().includes(searchTerm);
+                const matchesStatus = statusTerm === 'ALL' || e.overallStatus === statusTerm;
+                return matchesSearch && matchesStatus;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+             // Sort: last entered/updated exam appears first
+            filtered.sort((a, b) => {
+                const dateA = a.updatedAt || a.id || '';
+                const dateB = b.updatedAt || b.id || '';
+                return dateB.localeCompare(dateA);
+            });
+            grid.innerHTML = filtered.map(exam => {
+                const statusColor = getStatusBadge(exam.overallStatus);
+                const stagesCount = exam.stages ? exam.stages.length : 0;
+                const completedStages = exam.stages ? exam.stages.filter(s => s.status === 'Exam Completed' || s.status === 'Completed' || (s.status === 'Result Declared' && s.result === 'Pass')).length : 0;
+                const progressPct = stagesCount > 0 ? Math.round((completedStages / stagesCount) * 100) : 0;
+                const scheduledStage = (exam.stages || []).find(s => s.status === 'Scheduled');
+
+                return `
+                <div class="bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 rounded-xl p-5 flex flex-col justify-between transition group shadow-lg">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${statusColor}">
+                                ${escapeHtml(exam.overallStatus)}
+                            </span>
+                            <span class="text-xs font-semibold text-slate-400">
+                                ${exam.applicationFee ? '₹' + escapeHtml(exam.applicationFee) : ''}
+                            </span>
+                        </div>
+                        
+                        <h3 class="text-base font-bold text-white group-hover:text-sky-400 transition cursor-pointer" onclick="viewExam('${exam.id}')">
+                            ${escapeHtml(exam.name)}
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">${escapeHtml(exam.conductingBody || '')} ${exam.conductingBody && exam.postName ? '•' : ''} ${escapeHtml(exam.postName || '')}</p>
+
+                        <!-- Roll / Registration No. Tag with 1-click Copy -->
+                        ${exam.rollNumber ? `
+                        <div class="mt-2.5 flex items-center justify-between bg-slate-950/80 border border-slate-800/90 rounded-lg px-2.5 py-1 text-xs">
+                            <span class="text-[11px] text-slate-400 flex items-center gap-1.5 truncate">
+                                <i class="fa-solid fa-id-card text-sky-400 text-[10px] flex-shrink-0"></i>
+                                <span class="text-[10px] uppercase font-bold text-slate-500">Roll:</span>
+                                <span class="font-mono text-slate-200 font-semibold truncate">${escapeHtml(exam.rollNumber)}</span>
+                            </span>
+                            <button type="button" onclick="event.stopPropagation(); copyRawText('${escapeHtml(exam.rollNumber).replace(/'/g, "\\'")}', this)" class="text-slate-400 hover:text-sky-300 p-1 rounded hover:bg-slate-800/80 transition flex-shrink-0" title="Copy Roll / Registration No.">
+                                <i class="fa-regular fa-copy text-xs"></i>
+                            </button>
+                        </div>
+                        ` : ''}
+
+                        <!-- Scheduled Active Phase Tag if any -->
+                        ${scheduledStage ? `
+                        <div class="mt-2.5 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-sky-950/70 border border-sky-500/40 text-sky-300 text-[11px] font-medium shadow-sm">
+                            <i class="fa-regular fa-calendar-days text-sky-400"></i>
+                            <span>Scheduled: <strong class="text-white">${escapeHtml(scheduledStage.name)}</strong> ${scheduledStage.date ? '<span class="text-sky-400 font-mono font-bold">(' + formatStageDate(scheduledStage.date) + ')</span>' : ''}</span>
+                        </div>
+                        ` : ''}
+
+                        <!-- Stages & Stepped Progress Bar -->
+                        <div class="mt-4 pt-3 border-t border-slate-800/80 space-y-2.5">
+                            <!-- Stages written above the progress bar -->
+                            ${stagesCount > 0 ? `
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between items-end gap-1 px-1">
+                                    ${exam.stages.map((stage) => {
+                                        const isCleared = stage.status === 'Exam Completed' || stage.status === 'Completed' || (stage.status === 'Result Declared' && stage.result === 'Pass');
+                                        const isFailed = stage.status === 'Result Declared' && stage.result === 'Fail';
+                                        const isScheduled = stage.status === 'Scheduled';
+                                        const formattedDate = formatStageDate(stage.date);
+                                        const dateLabel = isScheduled && formattedDate ? `(${formattedDate})` : '';
+
+                                        let textColor = 'text-slate-500';
+                                        if (isCleared) textColor = 'text-emerald-400 font-semibold';
+                                        else if (isFailed) textColor = 'text-rose-400 font-semibold';
+                                        else if (isScheduled) textColor = 'text-sky-400 font-bold';
+
+                                        return `
+                                        <div class="flex flex-col items-center flex-1 text-center min-w-0">
+                                            <span class="text-[10px] truncate w-full ${textColor}" title="${escapeHtml(stage.name)} ${dateLabel}">
+                                                ${escapeHtml(stage.name)}
+                                            </span>
+                                            ${dateLabel ? `<span class="text-[9px] font-mono font-bold text-sky-400 bg-sky-950/90 px-1 py-0.5 rounded border border-sky-500/40 whitespace-nowrap mt-0.5">${dateLabel}</span>` : ''}
+                                        </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+
+                                <!-- Progress Bar (reaches to completed stage) -->
+                                <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                                    <div class="bg-gradient-to-r from-sky-500 to-emerald-500 h-2 rounded-full transition-all duration-500 shadow-sm shadow-sky-500/30" style="width: ${progressPct}%"></div>
+                                </div>
+                            </div>
+                            ` : ''}
+
+                            <!-- Stages List with Status Badges (No dropdown) -->
+                            <div class="space-y-1.5 pt-1">
+                                ${(exam.stages || []).map((stage, sIdx) => {
+                                    const isCleared = stage.status === 'Exam Completed' || stage.status === 'Completed' || (stage.status === 'Result Declared' && stage.result === 'Pass');
+                                    const isFailed = stage.status === 'Result Declared' && stage.result === 'Fail';
+                                    const isScheduled = stage.status === 'Scheduled';
+                                    const formattedDate = formatStageDate(stage.date);
+
+                                    return `
+                                    <div class="flex items-center justify-between bg-slate-950/80 border ${isCleared ? 'border-emerald-500/30 bg-emerald-950/10' : isFailed ? 'border-rose-500/30 bg-rose-950/10' : isScheduled ? 'border-sky-500/40 bg-sky-950/20 shadow-sm shadow-sky-500/10' : 'border-slate-800/80'} rounded-lg px-2.5 py-1.5 text-xs transition">
+                                        <div class="flex items-center space-x-2 min-w-0 pr-2">
+                                            <span class="w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${isCleared ? 'bg-emerald-500 text-slate-950' : isFailed ? 'bg-rose-500 text-white' : isScheduled ? 'bg-sky-500 text-slate-950 animate-pulse' : 'bg-slate-800 text-slate-400'}">
+                                                ${isCleared ? '✓' : isFailed ? '✕' : (sIdx + 1)}
+                                            </span>
+                                            <span class="font-medium text-slate-200 truncate">
+                                                ${escapeHtml(stage.name)}
+                                                ${isScheduled && formattedDate ? `<span class="text-sky-400 font-mono font-semibold ml-1">(${formattedDate})</span>` : ''}
+                                            </span>
+                                        </div>
+
+                                        <div class="flex items-center space-x-1 flex-shrink-0">
+                                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${getStageStatusBadge(stage)}">
+                                                ${getStageStatusText(stage)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('') || '<p class="text-[11px] text-slate-500 italic py-1">No stages defined. Edit exam to add phases.</p>'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+                        <span class="text-[11px]">${exam.totalPosts ? 'Vacancies: <strong class="text-slate-300">' + escapeHtml(exam.totalPosts) + '</strong>' : ''}</span>
+                        <div class="flex space-x-2">
+                            <button onclick="viewExam('${exam.id}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-medium transition">
+                                Details
+                            </button>
+                            <button onclick="openExamModal('${exam.id}')" class="p-1 text-slate-500 hover:text-sky-400">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats() {
+            document.getElementById('statTotal').innerText = exams.length;
+            document.getElementById('statUpcoming').innerText = exams.filter(e => e.overallStatus === 'Upcoming' || e.overallStatus === 'Form Filled' || e.overallStatus === 'Notification').length;
+
+            // Results Awaited: exams with overallStatus 'Waiting Result' OR
+            // any stage marked 'Exam Completed'/'Completed' but exam not already Passed/Failed/Cancelled
+            const awaitedCount = exams.filter(e => {
+                if (e.overallStatus === 'Waiting Result') return true;
+                if (e.overallStatus === 'Passed' || e.overallStatus === 'Failed' || e.overallStatus === 'Cancelled') return false;
+                const hasExamCompleted = (e.stages || []).some(s => s.status === 'Exam Completed' || s.status === 'Completed');
+                const hasFailed = (e.stages || []).some(s => s.status === 'Result Declared' && s.result === 'Fail');
+                return hasExamCompleted && !hasFailed;
+            }).length;
+            document.getElementById('statAwaited').innerText = awaitedCount;
+
+            document.getElementById('statPassed').innerText = exams.filter(e => e.overallStatus === 'Passed').length;
+            document.getElementById('statFailed').innerText = exams.filter(e => e.overallStatus === 'Failed' || e.overallStatus === 'Cancelled').length;
+
+            const totalFees = exams.reduce((acc, curr) => acc + (parseFloat(curr.applicationFee) || 0), 0);
+            document.getElementById('statFees').innerText = '₹' + totalFees.toLocaleString('en-IN');
+        }
+
+        function filterExams() {
+            renderExams();
+        }
+
+        // Format date string (YYYY-MM-DD) into DD/MM/YY format (e.g. 29/11/26)
+        function formatStageDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.trim().split('-');
+            if (parts.length === 3) {
+                const year = parts[0].slice(-2);
+                const month = parts[1].padStart(2, '0');
+                const day = parts[2].padStart(2, '0');
+                return `${day}/${month}/${year}`;
+            }
+            return dateStr;
+        }
+
+        function getStageStatusBadge(stage) {
+            if (!stage || !stage.status || stage.status === 'Not Started') {
+                return 'bg-slate-800 text-slate-400 border border-slate-700/60';
+            }
+            if (stage.status === 'Scheduled') {
+                return 'bg-sky-500/15 text-sky-400 border border-sky-500/30';
+            }
+            if (stage.status === 'Exam Completed' || stage.status === 'Completed') {
+                return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+            }
+            if (stage.status === 'Result Declared') {
+                if (stage.result === 'Pass') {
+                    return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold';
+                } else if (stage.result === 'Fail') {
+                    return 'bg-rose-500/20 text-rose-400 border border-rose-500/40 font-bold';
+                }
+                return 'bg-amber-500/15 text-amber-400 border border-amber-500/30';
+            }
+            return 'bg-slate-800 text-slate-300 border border-slate-700';
+        }
+
+        function getStageStatusText(stage) {
+            if (!stage || !stage.status) return 'Not Started';
+            if (stage.status === 'Result Declared') {
+                if (stage.result === 'Pass') {
+                    return stage.scores ? `Passed (${stage.scores})` : 'Passed';
+                } else if (stage.result === 'Fail') {
+                    return stage.scores ? `Failed (${stage.scores})` : 'Failed';
+                }
+                return 'Result Declared';
+            }
+            if (stage.status === 'Completed') return 'Exam Completed';
+            return stage.status;
+        }
+
+        // Form stage status & result change handlers
+        function handleStageStatusChange(selectElem) {
+            const row = selectElem.closest('.stage-row');
+            const dateContainer = row.querySelector('.stage-date-container');
+            const resultSection = row.querySelector('.stage-result-section');
+            const resultSelect = row.querySelector('.stage-result');
+            const scoresInput = row.querySelector('.stage-scores');
+
+            // If select Not Started then hide date field, if Scheduled or others then show date field
+            if (selectElem.value === 'Not Started') {
+                if (dateContainer) dateContainer.classList.add('hidden');
+            } else {
+                if (dateContainer) dateContainer.classList.remove('hidden');
+            }
+
+            if (selectElem.value === 'Result Declared') {
+                resultSection.classList.remove('hidden');
+                if (resultSelect.value === 'Pass' || resultSelect.value === 'Fail') {
+                    scoresInput.disabled = false;
+                } else {
+                    scoresInput.disabled = true;
+                }
+            } else {
+                resultSection.classList.add('hidden');
+                resultSelect.value = '';
+                scoresInput.disabled = true;
+                scoresInput.value = '';
+            }
+        }
+
+        function handleStageResultChange(selectElem) {
+            const row = selectElem.closest('.stage-row');
+            const scoresInput = row.querySelector('.stage-scores');
+
+            if (selectElem.value === 'Pass' || selectElem.value === 'Fail') {
+                scoresInput.disabled = false;
+                scoresInput.focus();
+
+                // If user selects Fail, automatically set overall exam status to Failed
+                if (selectElem.value === 'Fail') {
+                    const overallStatusElem = document.getElementById('overallStatus');
+                    if (overallStatusElem) {
+                        overallStatusElem.value = 'Failed';
+                    }
+                }
+            } else {
+                scoresInput.disabled = true;
+                scoresInput.value = '';
+            }
+        }
+
+        // -------------------------------------------------------------
+        // DYNAMIC STAGE FORM HANDLING (Zero placeholder text)
+        // -------------------------------------------------------------
+        function addStageInput(stage = {}) {
+            const container = document.getElementById('stagesContainer');
+            const div = document.createElement('div');
+            const currentStatus = stage.status || 'Not Started';
+            const isNotStarted = currentStatus === 'Not Started';
+            const isScheduled = currentStatus === 'Scheduled';
+            const isExamCompleted = currentStatus === 'Exam Completed' || currentStatus === 'Completed';
+            const isResultDeclared = currentStatus === 'Result Declared';
+            const hasResult = isResultDeclared && (stage.result === 'Pass' || stage.result === 'Fail');
+
+            div.className = "stage-row bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2";
+            div.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <input type="text" value="${escapeHtml(stage.name || '')}" class="stage-name bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 w-2/3 focus:outline-none focus:border-sky-500">
+                    <button type="button" onclick="this.closest('.stage-row').remove()" class="text-xs text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-0.5">Status</label>
+                        <select onchange="handleStageStatusChange(this)" class="stage-status bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 w-full focus:outline-none focus:border-sky-500">
+                            <option value="Not Started" ${isNotStarted ? 'selected' : ''}>Not Started</option>
+                            <option value="Scheduled" ${isScheduled ? 'selected' : ''}>Scheduled</option>
+                            <option value="Exam Completed" ${isExamCompleted ? 'selected' : ''}>Exam Completed</option>
+                            <option value="Result Declared" ${isResultDeclared ? 'selected' : ''}>Result Declared</option>
+                        </select>
+                    </div>
+                    <div class="stage-date-container ${isNotStarted ? 'hidden' : ''}">
+                        <label class="block text-[10px] text-slate-400 mb-0.5">Date</label>
+                        <input type="date" value="${stage.date || ''}" class="stage-date bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 w-full">
+                    </div>
+                </div>
+
+                <!-- Result & Score (Shown only if Result Declared is selected) -->
+                <div class="stage-result-section ${isResultDeclared ? '' : 'hidden'} grid grid-cols-2 gap-2 pt-1 border-t border-slate-900">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-0.5">Pass / Fail</label>
+                        <select onchange="handleStageResultChange(this)" class="stage-result bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 w-full focus:outline-none focus:border-sky-500">
+                            <option value="" ${!stage.result ? 'selected' : ''}>Select</option>
+                            <option value="Pass" ${stage.result === 'Pass' ? 'selected' : ''}>Pass</option>
+                            <option value="Fail" ${stage.result === 'Fail' ? 'selected' : ''}>Fail</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-0.5">Score / Cutoff</label>
+                        <input type="text" value="${escapeHtml(stage.scores || '')}" ${hasResult ? '' : 'disabled'} class="stage-scores bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 w-full focus:outline-none focus:border-sky-500 disabled:opacity-40 disabled:cursor-not-allowed">
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function openExamModal(id = null) {
+            document.getElementById('examForm').reset();
+            document.getElementById('stagesContainer').innerHTML = '';
+            document.getElementById('examId').value = '';
+
+            if (id) {
+                const exam = exams.find(e => e.id === id);
+                if (exam) {
+                    document.getElementById('examModalTitle').innerText = 'Edit Exam Record';
+                    document.getElementById('examId').value = exam.id;
+                    document.getElementById('examName').value = exam.name || '';
+                    document.getElementById('conductingBody').value = exam.conductingBody || '';
+                    document.getElementById('postName').value = exam.postName || '';
+                    document.getElementById('totalPosts').value = exam.totalPosts || '';
+                    document.getElementById('applicationFee').value = exam.applicationFee || '';
+                    document.getElementById('applicationDate').value = exam.applicationDate || '';
+                    document.getElementById('overallStatus').value = exam.overallStatus || 'Form Filled';
+                    const rollInput = document.getElementById('rollNumber');
+                    if (rollInput) rollInput.value = exam.rollNumber || '';
+                    document.getElementById('syllabusText').value = exam.syllabusText || '';
+                    document.getElementById('notificationUrl').value = exam.notificationUrl || '';
+                    document.getElementById('admitCardUrl').value = exam.admitCardUrl || '';
+
+                    if (exam.stages && exam.stages.length) {
+                        exam.stages.forEach(s => addStageInput(s));
+                    }
+                }
+            } else {
+                document.getElementById('examModalTitle').innerText = 'Add Exam Record';
+                const rollInput = document.getElementById('rollNumber');
+                if (rollInput) rollInput.value = '';
+                addStageInput({ name: 'Stage 1' });
+            }
+
+            openModal('examModal');
+        }
+
+        function saveExam(event) {
+            event.preventDefault();
+            const id = document.getElementById('examId').value || 'exam_' + Date.now();
+
+             const newStatus = document.getElementById('overallStatus').value;
+            
+            // Get existing exam to compare status and preserve history
+            const existingExam = exams.find(e => e.id === id);
+            let statusHistory = (existingExam && existingExam.statusHistory) ? [...existingExam.statusHistory] : [];
+
+            // If this is a new exam, log the initial status
+            if (!existingExam) {
+                statusHistory.push({
+                    status: newStatus,
+                    date: document.getElementById('applicationDate').value || new Date().toISOString().split('T')[0],
+                    changedAt: new Date().toISOString()
+                });
+            } else if (existingExam.overallStatus !== newStatus) {
+                // Status changed — append to history
+                statusHistory.push({
+                    status: newStatus,
+                    date: new Date().toISOString().split('T')[0],
+                    changedAt: new Date().toISOString()
+                });
+            }
+            
+            const stageRows = document.querySelectorAll('.stage-row');
+            const stages = Array.from(stageRows).map(row => {
+                const status = row.querySelector('.stage-status').value;
+                const dateInput = row.querySelector('.stage-date');
+                const dateVal = (status === 'Not Started') ? '' : (dateInput ? dateInput.value : '');
+                const resultSelect = row.querySelector('.stage-result');
+                const result = (status === 'Result Declared' && resultSelect) ? resultSelect.value : '';
+                const scoresInput = row.querySelector('.stage-scores');
+                const scores = (result && scoresInput) ? scoresInput.value : '';
+
+                return {
+                    name: row.querySelector('.stage-name').value,
+                    date: dateVal,
+                    status: status,
+                    result: result,
+                    scores: scores
+                };
+            });
+
+            const exam = {
+                id: id,
+                name: document.getElementById('examName').value,
+                conductingBody: document.getElementById('conductingBody').value,
+                postName: document.getElementById('postName').value,
+                totalPosts: document.getElementById('totalPosts').value,
+                applicationFee: document.getElementById('applicationFee').value,
+                applicationDate: document.getElementById('applicationDate').value,
+                overallStatus: document.getElementById('overallStatus').value,
+                overallStatus: newStatus,
+                rollNumber: (document.getElementById('rollNumber') ? document.getElementById('rollNumber').value.trim() : ''),
+                syllabusText: document.getElementById('syllabusText').value,
+                notificationUrl: document.getElementById('notificationUrl').value,
+                admitCardUrl: document.getElementById('admitCardUrl').value,
+                stages: stages,
+                statusHistory: statusHistory,
+                updatedAt: new Date().toISOString()
+            };
+
+            persistExam(exam);
+            closeModal('examModal');
+        }
+
+         // Called when overallStatus dropdown changes in the form
+        function onOverallStatusChange() {
+            // placeholder for future use (e.g. auto-set applicationDate)
+        }
+
+        // -------------------------------------------------------------
+        // VIEW EXAM MODAL
+        // -------------------------------------------------------------
+        function viewExam(id) {
+            const exam = exams.find(e => e.id === id);
+            if (!exam) return;
+
+            const header = document.getElementById('viewModalHeader');
+            const body = document.getElementById('viewModalBody');
+
+            header.innerHTML = `
+                <div>
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${getStatusBadge(exam.overallStatus)}">
+                        ${escapeHtml(exam.overallStatus)}
+                    </span>
+                    <h3 class="text-lg font-bold text-white mt-1">${escapeHtml(exam.name)}</h3>
+                    <p class="text-xs text-slate-400">${escapeHtml(exam.conductingBody || '')} ${exam.conductingBody && exam.postName ? '•' : ''} ${escapeHtml(exam.postName || '')}</p>
+                </div>
+                <button onclick="closeModal('viewModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            `;
+
+            const syllabusLines = (exam.syllabusText || '').split('\n').filter(l => l.trim().length > 0);
+
+            body.innerHTML = `
+
+            <!-- Status History Timeline -->
+                ${(exam.statusHistory && exam.statusHistory.length) ? `
+                <div>
+                    <h4 class="font-bold text-slate-200 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-violet-400 text-xs"></i>
+                        Status History
+                    </h4>
+                    <div class="max-h-44 overflow-y-auto pr-1 space-y-0">
+                        ${exam.statusHistory.map((entry, idx) => {
+                            const isLast = idx === exam.statusHistory.length - 1;
+                            const formattedDate = formatStageDate(entry.date);
+                            const badgeClass = getStatusBadge(entry.status);
+                            return `
+                            <div class="flex items-start gap-3">
+                                <div class="flex flex-col items-center">
+                                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${isLast ? 'bg-sky-400 ring-2 ring-sky-400/30' : 'bg-slate-600'}"></span>
+                                    ${!isLast ? '<div class="w-px flex-1 bg-slate-800 min-h-[20px]"></div>' : ''}
+                                </div>
+                                <div class="pb-3 flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${badgeClass}">
+                                            ${escapeHtml(entry.status)}
+                                        </span>
+                                        ${formattedDate ? '<span class="text-[11px] font-mono text-slate-400">' + formattedDate + '</span>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+
+                <!-- Timeline Stages -->
+                <div>
+                    <h4 class="font-bold text-slate-200 mb-2">Examination Stages</h4>
+                    <div class="space-y-2">
+                        ${(exam.stages || []).map(s => {
+                            const formattedDate = formatStageDate(s.date);
+                            const isScheduled = s.status === 'Scheduled';
+                            return `
+                            <div class="p-3 bg-slate-950 rounded-lg border ${isScheduled ? 'border-sky-500/40 bg-sky-950/15' : 'border-slate-800'} flex justify-between items-center">
+                                <div>
+                                    <p class="font-semibold text-slate-200">
+                                        ${escapeHtml(s.name)}
+                                        ${isScheduled && formattedDate ? `<span class="text-sky-400 font-mono font-bold ml-1">(${formattedDate})</span>` : ''}
+                                    </p>
+                                    <p class="text-[11px] text-slate-500">
+                                        ${s.date ? 'Date: ' + formattedDate : 'Date Awaited'}
+                                        ${s.result ? ' • ' + (s.result === 'Pass' ? '<strong class="text-emerald-400">Passed</strong>' : '<strong class="text-rose-400">Failed</strong>') : ''}
+                                        ${s.scores ? ' • Score: ' + escapeHtml(s.scores) : ''}
+                                    </p>
+                                </div>
+                                <span class="text-[10px] px-2 py-1 rounded ${getStageStatusBadge(s)} font-semibold">${getStageStatusText(s)}</span>
+                            </div>
+                            `;
+                        }).join('') || '<p class="text-slate-500 italic">No stages defined.</p>'}
+                    </div>
+                </div>
+
+                <!-- Syllabus Checklist -->
+                ${syllabusLines.length ? `
+                <div class="border-t border-slate-800 pt-3">
+                    <h4 class="font-bold text-slate-200 mb-2">Syllabus Breakdown</h4>
+                    <div class="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                        ${syllabusLines.map((line) => `
+                            <label class="flex items-start space-x-2 text-slate-300 hover:text-white cursor-pointer bg-slate-950/40 p-1.5 rounded">
+                                <input type="checkbox" class="mt-0.5 rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-0">
+                                <span>${escapeHtml(line)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Roll / Registration No. Box with Copy Button -->
+                ${exam.rollNumber ? `
+                <div class="border-t border-slate-800 pt-3">
+                    <div class="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800">
+                        <div>
+                            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Roll / Registration No.</span>
+                            <span class="font-mono text-sm font-semibold text-sky-400 select-all">${escapeHtml(exam.rollNumber)}</span>
+                        </div>
+                        <button type="button" onclick="copyRawText('${escapeHtml(exam.rollNumber).replace(/'/g, "\\'")}', this)" class="px-3 py-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center space-x-1.5 transition border border-slate-700/60" title="Copy to clipboard">
+                            <i class="fa-regular fa-copy"></i>
+                            <span>Copy</span>
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- External Links -->
+                <div class="border-t border-slate-800 pt-3 flex flex-wrap gap-2">
+                    ${exam.notificationUrl ? `<a href="${exam.notificationUrl}" target="_blank" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded text-xs font-medium"><i class="fa-solid fa-file-pdf me-1"></i> Notification</a>` : ''}
+                    ${exam.admitCardUrl ? `<a href="${exam.admitCardUrl}" target="_blank" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded text-xs font-medium"><i class="fa-solid fa-ticket me-1"></i> Admit Card</a>` : ''}
+                </div>
+            `;
+
+            document.getElementById('editExamBtn').onclick = () => {
+                closeModal('viewModal');
+                openExamModal(exam.id);
+            };
+
+            document.getElementById('deleteExamBtn').onclick = () => {
+                if (confirm(`Are you sure you want to delete "${exam.name}"?`)) {
+                    removeExam(exam.id);
+                    closeModal('viewModal');
+                }
+            };
+
+            openModal('viewModal');
+        }
+
+        // -------------------------------------------------------------
+        // HELPERS & MODAL UTILITIES
+        // -------------------------------------------------------------
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'Passed': return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+                case 'Failed': 
+                case 'Cancelled': return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+                case 'Waiting Result': return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+                case 'Upcoming': return 'bg-sky-500/10 text-sky-400 border border-sky-500/20';
+                 case 'Notification': return 'bg-violet-500/10 text-violet-400 border border-violet-500/20';
+                default: return 'bg-slate-800 text-slate-300 border border-slate-700';
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, match => {
+                const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+                return map[match];
+            });
+        }
+
+        // -------------------------------------------------------------
+        // CLIPBOARD COPY UTILITIES
+        // -------------------------------------------------------------
+        function copyRawText(text, btnElem) {
+            if (!text) return;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopySuccess(btnElem);
+                }).catch(() => {
+                    fallbackCopyText(text, btnElem);
+                });
+            } else {
+                fallbackCopyText(text, btnElem);
+            }
+        }
+
+        function copyFieldText(fieldId, btnElem) {
+            const input = document.getElementById(fieldId);
+            if (!input || !input.value.trim()) return;
+            copyRawText(input.value.trim(), btnElem);
+        }
+
+        function fallbackCopyText(text, btnElem) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showCopySuccess(btnElem);
+            } catch (err) {
+                console.error('Copy fallback error:', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function showCopySuccess(btnElem) {
+            if (!btnElem) return;
+            const originalHTML = btnElem.innerHTML;
+            btnElem.innerHTML = '<i class="fa-solid fa-check text-emerald-400 text-xs"></i>';
+            setTimeout(() => {
+                btnElem.innerHTML = originalHTML;
+            }, 1500);
+        }
+
+        // -------------------------------------------------------------
+        // PROGRESSIVE WEB APP (PWA) INSTALLATION & SERVICE WORKER
+        // -------------------------------------------------------------
+        function setupPwa() {
+            const installAppBtn = document.getElementById('installAppBtn');
+
+            // Register Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.log('SW registration note:', err);
+                });
+            }
+
+            // Capture install prompt for 1-click install
+            window.addEventListener('beforeinstallprompt', e => {
+                e.preventDefault();
+                deferredInstallPrompt = e;
+                if (installAppBtn) installAppBtn.classList.remove('hidden');
+            });
+
+            window.addEventListener('appinstalled', () => {
+                if (installAppBtn) installAppBtn.classList.add('hidden');
+                deferredInstallPrompt = null;
+            });
+        }
+
+        async function triggerPwaInstall() {
+            const installAppBtn = document.getElementById('installAppBtn');
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                if (installAppBtn) installAppBtn.classList.add('hidden');
+            }
+            deferredInstallPrompt = null;
+        }
+    </script>
+</body>
+</html>
