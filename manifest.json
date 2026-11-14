@@ -2,7 +2,7 @@
   "name": "ExamTrack - Personal Exam Vault",
   "short_name": "ExamTrack",
   "description": "Private competitive exam tracker and syllabus checklist",
-  "start_url": "./exam_tracker_app.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#020617",
