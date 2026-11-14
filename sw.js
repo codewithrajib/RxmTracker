@@ -1,7 +1,7 @@
 const CACHE_NAME = 'examtrack-v1';
 const ASSETS_TO_CACHE = [
   './',
-  './exam_tracker_app.html',
+  './index.html',
   './manifest.json',
   './icon.svg'
 ];
